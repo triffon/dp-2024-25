@@ -129,6 +129,7 @@ public:
         Item::print(indent);
         std::cout << ", съдържаща: {" << std::endl;
         for(Item* item : children) {
+            // двоен отстъп за споделените инструменти
             item->print(indent.offset().offset());
             std::cout << std::endl;
         }
@@ -177,8 +178,8 @@ void testToolBox() {
      .addItem(tf.createTool("10", "Ключ"))
      .addItem(tf.createTool("12", "Ключ"))
      .addItem(&(new Box("Кутия2"))->addItem(tf.createTool("Скъпият", "Фазомер"))
-                                    .addItem(tf.createTool("10", "Ключ")));
-    ((Item&)b).print();
+                                    .addItem(tf.createTool("10", "Ключ")))
+     .Item::print();
     std::cout << std::endl;
     b[2][0].print();
     std::cout << std::endl;
