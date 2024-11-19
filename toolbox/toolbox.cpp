@@ -43,12 +43,26 @@ public:
     }
 };
 
+class Item;
+
+class Product {
+    Item* item;
+public:
+    Product(Item* _item);
+    virtual ~Product();
+    virtual void print(Indent indent) const;
+    virtual void print() const;
+    void setIndent(Indent indent);
+    bool isUnique() const;
+    Item* getItem() { return item; }
+};
+
 class Item {
 protected:
     std::string name;
 public:
     Item(std::string const& _name) : name(_name) {}
-    virtual Item& operator[](size_t index) = 0;
+    virtual Item const& operator[](size_t index) const = 0;
     virtual void print(Indent const& indent) const {
         indent.printIndent();
         std::cout << name;
@@ -71,7 +85,7 @@ public:
         std::cout << ' ' << type;
     }
 
-    Item& operator[](size_t) {
+    Item const& operator[](size_t) const {
         return *this;
     }
 
@@ -107,63 +121,78 @@ public:
 };
 
 class Box : public Item {
-    std::vector<Item*> children;
+    std::vector<Product*> children;
     Indent indent;
 public:
     Box(std::string const& name) : Item(name) {}
     Box(Box const&) = delete;
     Box& operator=(Box const&) = delete;
 
-    Box& addItem(Item* item) {
-        item->setIndent(indent.offset());
-        children.push_back(item);
+    Box& addProduct(Product* product) {
+        product->setIndent(indent.offset());
+        children.push_back(product);
         return *this;
     }
     void setIndent(Indent _indent) {
         indent = _indent;
-        for(Item* item : children)
-            item->setIndent(indent.offset());
+        for(Product* product : children)
+            product->setIndent(indent.offset());
     }
 
     void print(Indent const&) const {
         Item::print(indent);
         std::cout << ", съдържаща: {" << std::endl;
-        for(Item* item : children) {
+        for(Product* product : children) {
             // двоен отстъп за споделените инструменти
-            item->print(indent.offset().offset());
+            product->print(indent.offset().offset());
             std::cout << std::endl;
         }
         indent.printIndent();
         std::cout << "}";
     }
 
-    Item& operator[](size_t index) {
-        return *children[index];
+    Item const& operator[](size_t index) const {
+        return *(children[index]->getItem());
     }
 
     ~Box() {
-        for(Item* item : children)
-            if (item->isUnique())
-                delete item;
-
+        for(Product* product : children)
+            if (product->isUnique())
+                delete product;
     }
 
     bool isUnique() const { return true; }
 };
 
-class ToolFactory {
-    std::map<std::string, Tool*> sharedTools;
-    static size_t const NAME_THRESHOLD = 2;
+class BrandedProduct : public Product {
+    std::string brand;
 public:
-    Tool* createTool(std::string const& _name, std::string const& _type) {
+    BrandedProduct(Item* _item, std::string const& _brand) : Product(_item), brand(_brand) {}
+    void print(Indent indent) const {
+        Product::print(indent);
+        std::cout << " [" << brand << "]";
+    }
+};
+
+class ToolFactory {
+    std::map<std::string, Product*> sharedTools;
+    static size_t const NAME_THRESHOLD = 2;
+
+    Product* createProduct(Tool* _tool, std::string const& _brand) {
+        if (_brand != "")
+            return new BrandedProduct(_tool, _brand);
+        return new Product(_tool);
+    }
+public:
+    Product* createTool(std::string const& _name, std::string const& _type, std::string const& _brand = "") {
         if (_name.size() <= NAME_THRESHOLD) {
             // използваме споделен обект 
             if (sharedTools.find(_name) == sharedTools.end())
-                sharedTools[_name] = new SharedTool(_name, _type);
+                sharedTools[_name] = createProduct(new SharedTool(_name, _type), _brand);
             return sharedTools[_name];
         } else
             // правим уникален обект
-            return new UniqueTool(_name, _type);
+            return createProduct(new UniqueTool(_name, _type), _brand);
     }
     ~ToolFactory() {
         for(auto& it : sharedTools)
@@ -171,14 +200,36 @@ public:
     }
 };
 
+inline Product::Product(Item* _item) : item(_item) {}
+
+inline Product::~Product() {
+    delete item;
+}
+
+inline void Product::print(Indent indent) const {
+    item->print(indent);
+}
+
+inline void Product::print() const {
+    item->print();
+}
+
+inline void Product::setIndent(Indent indent) {
+    item->setIndent(indent);
+}
+
+inline bool Product::isUnique() const {
+    return item->isUnique();
+}
+
 void testToolBox() {
     ToolFactory tf;
     Box b("Кутия1");
-    b.addItem(tf.createTool("Оранжевите", "Клещи")).addItem(tf.createTool("Малката", "Отвертка"))
-     .addItem(tf.createTool("10", "Ключ"))
-     .addItem(tf.createTool("12", "Ключ"))
-     .addItem(&(new Box("Кутия2"))->addItem(tf.createTool("Скъпият", "Фазомер"))
-                                    .addItem(tf.createTool("10", "Ключ")))
+    b.addProduct(tf.createTool("Оранжевите", "Клещи", "ToolMaster")).addProduct(tf.createTool("Малката", "Отвертка"))
+     .addProduct(tf.createTool("10", "Ключ"))
+     .addProduct(tf.createTool("12", "Ключ"))
+     .addProduct(new BrandedProduct(&(new Box("Кутия2"))->addProduct(tf.createTool("Скъпият", "Фазомер"))
+                                    .addProduct(tf.createTool("10", "Ключ")), "Bosch"))
      .Item::print();
     std::cout << std::endl;
     b[2][0].print();
