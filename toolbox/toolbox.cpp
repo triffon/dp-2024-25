@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <map>
 
 class IntTree {
 private:
@@ -29,6 +30,7 @@ void testIntTree() {
 }
 
 class Item {
+protected:
     std::string name;
 public:
     Item(std::string const& _name) : name(_name) {}
@@ -36,6 +38,8 @@ public:
     virtual void print() const {
         std::cout << name;
     }
+    virtual bool isUnique() const = 0;
+
     virtual ~Item() = default;
 };
 
@@ -50,6 +54,26 @@ public:
 
     Item& operator[](size_t) {
         return *this;
+    }
+
+};
+
+class UniqueTool : public Tool {
+public:
+    UniqueTool(std::string const& _name, std::string const& _type) : Tool(_name, _type) {}
+    bool isUnique() const { return true; }
+    ~UniqueTool() {
+        std::cout << "Изтриване на уникален инструмент " << name << std::endl;
+    }
+};
+
+class SharedTool : public Tool {
+public:
+    SharedTool(std::string const& _name, std::string const& _type) : Tool(_name, _type) {}
+    bool isUnique() const { return false; }
+
+    ~SharedTool() {
+        std::cout << "Изтриване на споделен инструмент " << name << std::endl;
     }
 };
 
@@ -81,14 +105,42 @@ public:
 
     ~Box() {
         for(Item* item : children)
-            delete item;
+            if (item->isUnique())
+                delete item;
+
+    }
+
+    bool isUnique() const { return true; }
+};
+
+class ToolFactory {
+    std::map<std::string, Tool*> sharedTools;
+    static size_t const NAME_THRESHOLD = 2;
+public:
+    Tool* createTool(std::string const& _name, std::string const& _type) {
+        if (_name.size() <= NAME_THRESHOLD) {
+            // използваме споделен обект 
+            if (sharedTools.find(_name) == sharedTools.end())
+                sharedTools[_name] = new SharedTool(_name, _type);
+            return sharedTools[_name];
+        } else
+            // правим уникален обект
+            return new UniqueTool(_name, _type);
+    }
+    ~ToolFactory() {
+        for(auto& it : sharedTools)
+            delete it.second;
     }
 };
 
 void testToolBox() {
+    ToolFactory tf;
     Box b("Кутия1");
-    b.addItem(new Tool("Оранжевите", "Клещи")).addItem(new Tool("Малката", "Отвертка"))
-     .addItem(&(new Box("Кутия2"))->addItem(new Tool("Скъпият", "Фазомер")))
+    b.addItem(tf.createTool("Оранжевите", "Клещи")).addItem(tf.createTool("Малката", "Отвертка"))
+     .addItem(tf.createTool("10", "Ключ"))
+     .addItem(tf.createTool("12", "Ключ"))
+     .addItem(&(new Box("Кутия2"))->addItem(tf.createTool("Скъпият", "Фазомер"))
+                                    .addItem(tf.createTool("10", "Ключ")))
      .print();
     std::cout << std::endl;
     b[2][0].print();
