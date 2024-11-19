@@ -3,5 +3,10 @@
 		{
 			"path": "toolbox"
 		}
-	]
+	],
+	"settings": {
+		"files.associations": {
+			"iostream": "cpp"
+		}
+	}
 }
