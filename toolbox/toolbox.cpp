@@ -28,67 +28,67 @@ void testIntTree() {
     t.print();
 }
 
-class Component {
+class Item {
     std::string name;
 public:
-    Component(std::string const& _name) : name(_name) {}
-    virtual Component& operator[](size_t index) = 0;
+    Item(std::string const& _name) : name(_name) {}
+    virtual Item& operator[](size_t index) = 0;
     virtual void print() const {
         std::cout << name;
     }
-    virtual ~Component() = default;
+    virtual ~Item() = default;
 };
 
-class Tool : public Component {
+class Tool : public Item {
     std::string type;
 public:
-    Tool(std::string const& _name, std::string const& _type) : Component(_name), type(_type) {}
+    Tool(std::string const& _name, std::string const& _type) : Item(_name), type(_type) {}
     void print() const {
-        Component::print();
+        Item::print();
         std::cout << ' ' << type;
     }
 
-    Component& operator[](size_t) {
+    Item& operator[](size_t) {
         return *this;
     }
 };
 
-class Box : public Component {
-    std::vector<Component*> children;
+class Box : public Item {
+    std::vector<Item*> children;
 public:
-    Box(std::string const& name) : Component(name) {}
+    Box(std::string const& name) : Item(name) {}
     Box(Box const&) = delete;
     Box& operator=(Box const&) = delete;
 
-    Box& addComponent(Component* comp) {
-        children.push_back(comp);
+    Box& addItem(Item* item) {
+        children.push_back(item);
         return *this;
     }
 
     void print() const {
-        Component::print();
+        Item::print();
         std::cout << ", съдържаща: {" << std::endl;
-        for(Component* comp : children) {
-            comp->print();
+        for(Item* item : children) {
+            item->print();
             std::cout << std::endl;
         }
         std::cout << "}";
     }
 
-    Component& operator[](size_t index) {
+    Item& operator[](size_t index) {
         return *children[index];
     }
 
     ~Box() {
-        for(Component* comp : children)
-            delete comp;
+        for(Item* item : children)
+            delete item;
     }
 };
 
 void testToolBox() {
     Box b("Кутия1");
-    b.addComponent(new Tool("Оранжевите", "Клещи")).addComponent(new Tool("Малката", "Отвертка"))
-     .addComponent(&(new Box("Кутия2"))->addComponent(new Tool("Скъпият", "Фазомер")))
+    b.addItem(new Tool("Оранжевите", "Клещи")).addItem(new Tool("Малката", "Отвертка"))
+     .addItem(&(new Box("Кутия2"))->addItem(new Tool("Скъпият", "Фазомер")))
      .print();
     std::cout << std::endl;
     b[2][0].print();
