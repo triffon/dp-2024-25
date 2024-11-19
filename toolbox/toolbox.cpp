@@ -29,15 +29,34 @@ void testIntTree() {
     t.print();
 }
 
+class Indent {
+  size_t indent;
+  static char const INDENT_CHAR = ' ';
+  static size_t const INDENT_OFFSET = 2;
+public:
+    Indent(size_t _indent = 0) : indent(_indent) {}
+    void printIndent() const {
+        std::cout << std::string(indent, INDENT_CHAR);
+    }
+    Indent offset() const {
+        return Indent(indent + INDENT_OFFSET);
+    }
+};
+
 class Item {
 protected:
     std::string name;
 public:
     Item(std::string const& _name) : name(_name) {}
     virtual Item& operator[](size_t index) = 0;
-    virtual void print() const {
+    virtual void print(Indent const& indent) const {
+        indent.printIndent();
         std::cout << name;
     }
+    void print() const {
+        print(Indent());
+    }
+    virtual void setIndent(Indent) = 0;
     virtual bool isUnique() const = 0;
 
     virtual ~Item() = default;
@@ -47,8 +66,8 @@ class Tool : public Item {
     std::string type;
 public:
     Tool(std::string const& _name, std::string const& _type) : Item(_name), type(_type) {}
-    void print() const {
-        Item::print();
+    void print(Indent const& indent) const {
+        Item::print(indent);
         std::cout << ' ' << type;
     }
 
@@ -59,8 +78,17 @@ public:
 };
 
 class UniqueTool : public Tool {
+    Indent indent;
 public:
-    UniqueTool(std::string const& _name, std::string const& _type) : Tool(_name, _type) {}
+    UniqueTool(std::string const& _name, std::string const& _type) :
+        Tool(_name, _type) {}
+    void setIndent(Indent _indent) {
+        indent = _indent;
+    }
+    void print(Indent const&) const {
+        Tool::print(indent);
+    }
+
     bool isUnique() const { return true; }
     ~UniqueTool() {
         std::cout << "Изтриване на уникален инструмент " << name << std::endl;
@@ -71,6 +99,7 @@ class SharedTool : public Tool {
 public:
     SharedTool(std::string const& _name, std::string const& _type) : Tool(_name, _type) {}
     bool isUnique() const { return false; }
+    void setIndent(Indent) {}
 
     ~SharedTool() {
         std::cout << "Изтриване на споделен инструмент " << name << std::endl;
@@ -79,23 +108,31 @@ public:
 
 class Box : public Item {
     std::vector<Item*> children;
+    Indent indent;
 public:
     Box(std::string const& name) : Item(name) {}
     Box(Box const&) = delete;
     Box& operator=(Box const&) = delete;
 
     Box& addItem(Item* item) {
+        item->setIndent(indent.offset());
         children.push_back(item);
         return *this;
     }
+    void setIndent(Indent _indent) {
+        indent = _indent;
+        for(Item* item : children)
+            item->setIndent(indent.offset());
+    }
 
-    void print() const {
-        Item::print();
+    void print(Indent const&) const {
+        Item::print(indent);
         std::cout << ", съдържаща: {" << std::endl;
         for(Item* item : children) {
-            item->print();
+            item->print(indent.offset().offset());
             std::cout << std::endl;
         }
+        indent.printIndent();
         std::cout << "}";
     }
 
@@ -140,8 +177,8 @@ void testToolBox() {
      .addItem(tf.createTool("10", "Ключ"))
      .addItem(tf.createTool("12", "Ключ"))
      .addItem(&(new Box("Кутия2"))->addItem(tf.createTool("Скъпият", "Фазомер"))
-                                    .addItem(tf.createTool("10", "Ключ")))
-     .print();
+                                    .addItem(tf.createTool("10", "Ключ")));
+    ((Item&)b).print();
     std::cout << std::endl;
     b[2][0].print();
     std::cout << std::endl;
