@@ -62,7 +62,7 @@ protected:
     std::string name;
 public:
     Item(std::string const& _name) : name(_name) {}
-    virtual Item const& operator[](size_t index) const = 0;
+    virtual Item& operator[](size_t index) = 0;
     virtual void print(Indent const& indent) const {
         indent.printIndent();
         std::cout << name;
@@ -85,7 +85,7 @@ public:
         std::cout << ' ' << type;
     }
 
-    Item const& operator[](size_t) const {
+    Item& operator[](size_t) {
         return *this;
     }
 
@@ -120,11 +120,53 @@ public:
     }
 };
 
+class ChildrenPrintStrategy {
+public:
+    virtual void print(Indent indent, std::vector<Product*> const& children) const = 0;
+    virtual ~ChildrenPrintStrategy() = default;
+};
+
+class OneLinePrintStrategy : public ChildrenPrintStrategy {
+public:
+    virtual void print(Indent, std::vector<Product*> const& children) const {
+        std::cout << ", съдържаща: { ";
+        for(Product* product : children) {
+            // двоен отстъп за споделените инструменти
+            product->print();
+            std::cout << ", ";
+        }
+        std::cout << " }";
+    }
+};
+
+
+
+class IndentedPrintStrategy : public ChildrenPrintStrategy {
+public:
+    virtual void print(Indent indent, std::vector<Product*> const& children) const {
+        std::cout << ", съдържаща: {" << std::endl;
+        for(Product* product : children) {
+            // двоен отстъп за споделените инструменти
+            product->print(indent.offset().offset());
+            std::cout << std::endl;
+        }
+        indent.printIndent();
+        std::cout << "}";
+    }
+};
+
+class NullPrintStrategy : public ChildrenPrintStrategy {
+public:
+    virtual void print(Indent, std::vector<Product*> const&) const {}
+};
+
+
 class Box : public Item {
     std::vector<Product*> children;
     Indent indent;
+    ChildrenPrintStrategy* childrenPrintStrategy;
 public:
-    Box(std::string const& name) : Item(name) {}
+    Box(std::string const& name) : Item(name), childrenPrintStrategy(new NullPrintStrategy()) {}
     Box(Box const&) = delete;
     Box& operator=(Box const&) = delete;
 
@@ -141,24 +183,23 @@ public:
 
     void print(Indent const&) const {
         Item::print(indent);
-        std::cout << ", съдържаща: {" << std::endl;
-        for(Product* product : children) {
-            // двоен отстъп за споделените инструменти
-            product->print(indent.offset().offset());
-            std::cout << std::endl;
-        }
-        indent.printIndent();
-        std::cout << "}";
+        childrenPrintStrategy->print(indent, children);
     }
 
-    Item const& operator[](size_t index) const {
+    Item& operator[](size_t index) {
         return *(children[index]->getItem());
+    }
+
+    void setStrategy(ChildrenPrintStrategy* newStrategy) {
+        delete childrenPrintStrategy;
+        childrenPrintStrategy = newStrategy;
     }
 
     ~Box() {
         for(Product* product : children)
             if (product->isUnique())
                 delete product;
+        delete childrenPrintStrategy;
     }
 
     bool isUnique() const { return true; }
@@ -181,7 +222,7 @@ class ToolFactory {
     Product* createProduct(Tool* _tool, std::string const& _brand) {
         if (_brand != "")
             return new BrandedProduct(_tool, _brand);
-        return new Product(_tool);
+        return new Product(_tool);  
     }
 public:
     Product* createTool(std::string const& _name, std::string const& _type, std::string const& _brand = "") {
@@ -229,9 +270,18 @@ void testToolBox() {
      .addProduct(tf.createTool("10", "Ключ"))
      .addProduct(tf.createTool("12", "Ключ"))
      .addProduct(new BrandedProduct(&(new Box("Кутия2"))->addProduct(tf.createTool("Скъпият", "Фазомер"))
-                                    .addProduct(tf.createTool("10", "Ключ")), "Bosch"))
-     .Item::print();
+                                    .addProduct(tf.createTool("10", "Ключ")), "Bosch"));
+    b.Item::print();
     std::cout << std::endl;
+
+    b.setStrategy(new IndentedPrintStrategy());
+    b.Item::print();
+    std::cout << std::endl;
+
+    dynamic_cast<Box&>(b[4]).setStrategy(new OneLinePrintStrategy());
+    b.Item::print();
+    std::cout << std::endl;
+
     b[2][0].print();
     std::cout << std::endl;
     b[1][1][1][1][1][1].print();
